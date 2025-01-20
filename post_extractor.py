@@ -12,15 +12,24 @@ load_dotenv()
 api_key = os.getenv('GROQ_API_KEY')
 client = connect_chroma()
 
-def extract_post(filepath):
-    content_df = pd.read_csv(filepath)
-    content_list = content_df.to_dict(orient='records')
-    processed_content_list = []
-    for post in content_list:
-        metadata = reading_chain(post['text'], api_key)
-        processed_content_list.append(post | metadata)
-    store_posts(processed_content_list)
-    return processed_content_list
+def extract_post(filename):
+    filepath = os.path.join('assets', filename)
+
+    if not os.path.exists(filepath):
+        print(f"Error-\t{filename} not found\n")
+        return False
+    try:
+        content_df = pd.read_csv(filepath)
+        content_list = content_df.to_dict(orient='records')
+        processed_content_list = []
+        for post in content_list:
+            metadata = reading_chain(post['text'], api_key)
+            processed_content_list.append(post | metadata)
+        store_posts(processed_content_list)
+        return processed_content_list
+    except Exception as e:
+        print(f"Error Type-\t{type(e)}\nError-\t{e}\n")
+        return False
 
 
 
@@ -47,11 +56,13 @@ def store_posts(posts):
 def get_posts_from_collection(metadata, n_results):
     pc = client.get_collection(name='post_collection')
     where_clause = {
-        "$or": [{"tags": {"$in": metadata["tags"]}}, {"language": metadata["language"]}]
+        "$or": [{"tags": {"$in": metadata["tags"]}}, {"language": {"$in": metadata["language"]}}]
     }
-    query_results = pc.query(
-        query_texts='', n_results=n_results, where=where_clause, include=['documents']
-    )
-
-    print(query_results)
-    return query_results['documents']
+    try:
+        query_results = pc.query(
+            query_texts='', n_results=n_results, where=where_clause, include=['documents']
+        )
+        return query_results['documents']
+    except Exception as e:
+        print(f"Error Type-\t{type(e)}\nError-\t{e}\n")
+        return False
